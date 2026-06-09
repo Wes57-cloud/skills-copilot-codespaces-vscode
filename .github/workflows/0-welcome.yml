@@ -25,7 +25,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - id: get_step
-        run: echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+        run: |
+          if [ ! -f ./.github/steps/-step.txt ]; then
+            echo "::error::Step tracking file not found at .github/steps/-step.txt"
+            exit 1
+          fi
+          current_step=$(cat ./.github/steps/-step.txt)
+          if [ -z "$current_step" ]; then
+            echo "::error::Step tracking file is empty — expected a step number"
+            exit 1
+          fi
+          echo "current_step=$current_step" >> $GITHUB_OUTPUT
     outputs:
       current_step: ${{ steps.get_step.outputs.current_step }}
 
