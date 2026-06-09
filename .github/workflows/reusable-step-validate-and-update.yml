@@ -1,0 +1,74 @@
+name: Reusable Step Validate and Update
+
+on:
+  workflow_call:
+    inputs:
+      expected_step:
+        description: "The step number this workflow expects to be current"
+        required: true
+        type: string
+      from_step:
+        description: "Step number to transition from"
+        required: true
+        type: string
+      to_step:
+        description: "Step number to transition to"
+        required: true
+        type: string
+      check_file:
+        description: "Optional file path to validate"
+        required: false
+        type: string
+        default: ""
+      check_search:
+        description: "Optional search pattern for file validation"
+        required: false
+        type: string
+        default: ""
+      fetch_depth:
+        description: "Git fetch depth (0 for full history)"
+        required: false
+        type: number
+        default: 1
+
+permissions:
+  contents: write
+
+jobs:
+  get_current_step:
+    name: Check current step number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get_step
+        run: echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
+
+  validate_and_update:
+    name: Validate and update step
+    needs: get_current_step
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == inputs.expected_step }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Check file contents
+        if: ${{ inputs.check_file != '' }}
+        uses: skills/action-check-file@v1
+        with:
+          file: ${{ inputs.check_file }}
+          search: ${{ inputs.check_search }}
+
+      - name: Update step
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: ${{ inputs.from_step }}
+          to_step: ${{ inputs.to_step }}
