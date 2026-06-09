@@ -31,7 +31,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - id: get_step
-        run: echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+        run: |
+          if [ ! -f ./.github/steps/-step.txt ]; then
+            echo "::error::Step tracking file not found at .github/steps/-step.txt"
+            exit 1
+          fi
+          current_step=$(cat ./.github/steps/-step.txt)
+          if [ -z "$current_step" ]; then
+            echo "::error::Step tracking file is empty — expected a step number"
+            exit 1
+          fi
+          echo "current_step=$current_step" >> $GITHUB_OUTPUT
     outputs:
       current_step: ${{ steps.get_step.outputs.current_step }}
 
@@ -56,11 +66,19 @@ jobs:
           fetch-depth: 0 # Let's get all the branches.
 
       # Verify the learner added the file contents.
-      - name: Check workflow contents, jobs
+      - name: Check comments.js for web server comment
+        id: check_comments_js
         uses: skills/action-check-file@v1
         with:
           file: "comments.js"
           search: "Create web server"
+
+      - name: Report check failure
+        if: failure() && steps.check_comments_js.outcome == 'failure'
+        run: |
+          echo "::error::comments.js is missing or does not contain a 'Create web server' comment."
+          echo "::error::Please create comments.js with comments describing a web server, then accept Copilot suggestions."
+          exit 1
 
       # In README.md, switch step 3 for step X.
       - name: Update to step X

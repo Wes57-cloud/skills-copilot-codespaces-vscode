@@ -31,7 +31,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - id: get_step
-        run: echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+        run: |
+          if [ ! -f ./.github/steps/-step.txt ]; then
+            echo "::error::Step tracking file not found at .github/steps/-step.txt"
+            exit 1
+          fi
+          current_step=$(cat ./.github/steps/-step.txt)
+          if [ -z "$current_step" ]; then
+            echo "::error::Step tracking file is empty — expected a step number"
+            exit 1
+          fi
+          echo "current_step=$current_step" >> $GITHUB_OUTPUT
     outputs:
       current_step: ${{ steps.get_step.outputs.current_step }}
 
@@ -56,11 +66,19 @@ jobs:
           fetch-depth: 0 # Let's get all the branches.
 
       # Verify the skills member function is present.
-      - name: Check package for axios version 0.21.2
+      - name: Check member.js for skillsMember function
+        id: check_member_js
         uses: skills/action-check-file@v1
         with:
           file: "member.js"
           search: "skillsMember"
+
+      - name: Report check failure
+        if: failure() && steps.check_member_js.outcome == 'failure'
+        run: |
+          echo "::error::member.js is missing or does not contain the 'skillsMember' function."
+          echo "::error::Please create member.js with a function named 'skillsMember' using Copilot hub suggestions."
+          exit 1
 
       # In README.md, switch step 3 for step 4.
       - name: Update to step 4

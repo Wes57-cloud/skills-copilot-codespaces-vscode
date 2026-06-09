@@ -31,7 +31,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - id: get_step
-        run: echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+        run: |
+          if [ ! -f ./.github/steps/-step.txt ]; then
+            echo "::error::Step tracking file not found at .github/steps/-step.txt"
+            exit 1
+          fi
+          current_step=$(cat ./.github/steps/-step.txt)
+          if [ -z "$current_step" ]; then
+            echo "::error::Step tracking file is empty — expected a step number"
+            exit 1
+          fi
+          echo "current_step=$current_step" >> $GITHUB_OUTPUT
     outputs:
       current_step: ${{ steps.get_step.outputs.current_step }}
 
@@ -55,10 +65,18 @@ jobs:
 
       # Verify the learner added the file contents.
       - name: Check workflow contents, jobs
+        id: check_devcontainer
         uses: skills/action-check-file@v1
         with:
           file: ".devcontainer/devcontainer.json"
           search: "GitHub\\.copilot"
+
+      - name: Report check failure
+        if: failure() && steps.check_devcontainer.outcome == 'failure'
+        run: |
+          echo "::error::.devcontainer/devcontainer.json is missing or does not contain the GitHub.copilot extension."
+          echo "::error::Please ensure your devcontainer.json includes 'GitHub.copilot' in the extensions array."
+          exit 1
 
       # In README.md, switch step 1 for step 2.
       - name: Update to step 2
